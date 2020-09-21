@@ -34,7 +34,7 @@ VALID_COLS = {
     "被执行人": {"案号", "执行标的", "执行法院"},
     "失信被执行": {"案号", "执行依据文号", "执行法院", "被执行人履行情况"},
     "限制高消费": {"案号", "限消法人或组织", "执行法院", "申请执行人"},
-    "开庭公告": {"案由", "原告/上诉人/申请人", "被告/被上诉人/被申请人"},
+    "开庭公告": {"案由", "当事人"},
     "股权冻结": {"被执行人", "股权数额", "执行通知书文号", "起止日期", "类型/状态"},
     "行政处罚": {"决定文书号", "处罚内容", "处罚机关"},
     "环保处罚": {"决定文书号", "处罚内容", "处罚机关"},
@@ -103,6 +103,28 @@ class Table:
     def merge(self, b):
         self.col_names.extend(b.col_names)
         self.body = [row_a + row_b for row_a, row_b in zip(self.body, b.body)]
+    
+    def _zig_zag_skip_boolean(self, table_entry_with_flag):
+        result = [None] * (2 * len(self.col_names))
+        result[::2] = (col_name + ": " for col_name in self.col_names)
+        result[1::2] = (
+            entry + "; " if idx != len(self.col_names) - 1 else entry
+            for idx, entry in enumerate(table_entry_with_flag[1:])
+        )
+        return "".join(result)
+
+    def to_entrys(self):
+        dated_entrys = [
+            self._zig_zag_skip_boolean(table_entry)
+            for table_entry in self.body
+            if not table_entry[0]
+        ]
+        non_dated_entrys = [
+            self._zig_zag_skip_boolean(table_entry)
+            for table_entry in self.body
+            if table_entry[0]
+        ]
+        return dated_entrys, non_dated_entrys
 
 
 def login(driver, usern, passw):
@@ -322,4 +344,11 @@ def fetch_news_section(driver, section):
         )
         if not _go_to_next_table_page(driver, table_nav, next_page_idx):
             break
-    return news_titles
+    
+    dated_entrys = [
+        news_title[1] for news_title in news_titles if not news_title[0]
+    ]
+    non_dated_entrys = [
+        news_title[1] for news_title in news_titles if news_title[0]
+    ]
+    return dated_entrys, non_dated_entrys

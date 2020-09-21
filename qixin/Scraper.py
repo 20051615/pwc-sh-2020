@@ -43,46 +43,55 @@ SUBPAGE = {
     "新闻舆情": "经营信息"
 }
 
-
 def getColIndex(letter):
     return ord(letter.lower()) - ord('a') + 1
+
+def _pair_extend(risk_contents, risk_types, new_risk_contents, section_name):
+    risk_contents[0].extend(new_risk_contents[0])
+    risk_contents[1].extend(new_risk_contents[1])
+    risk_types[0].extend([section_name] * len(new_risk_contents[0]))
+    risk_types[1].extend([section_name] * len(new_risk_contents[1]))
 
 def getRiskStrings(company_name):
     company_code = get_company_code(driver, company_name)
     if company_code is None:
         return "未找到", "！！！未找到全名完全匹配的经销商！！！"
-    print(company_name)
+    risk_contents = [], []
+    risk_types = [], []
     current_subpage = ""
     current_subpage_sections = None
     for section_name in SECTIONS:
-        print(section_name)
+        extend_result_with = lambda new_risk_contents : _pair_extend(risk_contents, risk_types, new_risk_contents, section_name)
+
         if SUBPAGE[section_name] != current_subpage:
             current_subpage = SUBPAGE[section_name]
             current_subpage_sections = navigate_to_subpage(driver, company_code, current_subpage)
         section = current_subpage_sections[section_name]
+
         if section_name not in SPECIAL_SECTIONS:
             main_table = fetch_section(driver, section, section_name)
             if main_table is not None:
-                print(main_table.col_names)
-                for row in main_table.body:
-                    print(list(map(lambda col:str(col)[:30], row)))
+                extend_result_with(main_table.to_entrys())
         else:
             if section_name == "税务异常":
                 tab1_table, tab2_table = fetch_tax_section(driver, section)
                 if tab1_table is not None:
-                    print(tab1_table.col_names)
-                    for row in tab1_table.body:
-                        print(list(map(lambda col:str(col)[:30], row)))
+                    extend_result_with(tab1_table.to_entrys())
                 if tab2_table is not None:
-                    print(tab2_table.col_names)
-                    for row in tab2_table.body:
-                        print(list(map(lambda col:str(col)[:30], row)))
+                    extend_result_with(tab2_table.to_entrys())
             elif section_name == "新闻舆情":
                 news_titles = fetch_news_section(driver, section)
-                if news_titles:
-                    print(list(map(lambda pair:str(pair[0]) + ", " + pair[1][:30], news_titles)))
-    print("")
-    return company_code, ""
+                if news_titles is not None:
+                    extend_result_with(news_titles)
+
+    format_to_excel_string = lambda strings_pair : "\n".join(
+        "【" + str(idx + 1) + "】" + string
+        for idx, string in enumerate(strings_pair[0])
+    ) + "\n" if strings_pair[0] and strings_pair[1] else "" + "\n".join(
+        "【日期未经核实筛选_" + str(idx + 1) + "】" + string
+        for idx, string in enumerate(strings_pair[1])
+    )
+    return format_to_excel_string(risk_types), format_to_excel_string(risk_contents)
 
 if __name__ == "__main__":
     Tk().withdraw()
