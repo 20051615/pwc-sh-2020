@@ -1,0 +1,10 @@
+.vscode/
+**/data/
+__pycache__/
+*scratch*.txt
+.DS_Store
+/docs/
+chromedriver.exe
+chromedriver
+API_KEYS.txt
+config.py
